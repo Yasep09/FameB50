@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tes Kecepatan Internet</title>
+<style>
+:root{--bg:#e6e9ef;--ink:#4a5578;--mute:#8d96ae;--acc:#7b93d6;--dk:#c3c8d3;--lt:#fff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Poppins","Segoe UI",system-ui,sans-serif;display:flex;justify-content:center;padding:env(safe-area-inset-top,0) 20px env(safe-area-inset-bottom,0)}
+main{width:100%;max-width:400px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px 0}
+.dial{width:300px;max-width:84vw;aspect-ratio:1;border-radius:50%;background:var(--bg);box-shadow:14px 14px 30px var(--dk),-14px -14px 30px var(--lt);position:relative;display:grid;place-items:center}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.trk{fill:none;stroke:var(--bg);stroke-width:10}
+.trkw{fill:none;stroke:var(--bg);stroke-width:12;filter:drop-shadow(2px 2px 3px var(--dk)) drop-shadow(-2px -2px 3px var(--lt))}
+.arc{fill:none;stroke:var(--acc);stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .25s linear}
+.read{text-align:center;position:relative}
+.num{font-size:64px;font-weight:600;line-height:1;letter-spacing:-2px}
+.unit{font-size:15px;color:var(--mute);margin-top:6px}
+.state{font-size:13px;font-weight:600;margin-top:18px;display:flex;gap:6px;justify-content:center;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+.card{border-radius:20px;padding:14px 6px;text-align:center;background:var(--bg);box-shadow:inset 5px 5px 10px var(--dk),inset -5px -5px 10px var(--lt);transition:.3s}
+.card.on{box-shadow:inset 2px 2px 4px var(--dk),inset -2px -2px 4px var(--lt);color:var(--acc)}
+.card b{display:block;font-size:22px;font-weight:600}
+.card span{font-size:11px;color:var(--mute)}
+.card small{display:block;font-size:12px;font-weight:600;margin-bottom:4px}
+button{font:inherit;font-weight:600;color:var(--ink);border:0;cursor:pointer;background:var(--bg);border-radius:30px;padding:16px 56px;box-shadow:8px 8px 16px var(--dk),-8px -8px 16px var(--lt);transition:.15s}
+button:active,button:disabled{box-shadow:inset 4px 4px 8px var(--dk),inset -4px -4px 8px var(--lt)}
+button:disabled{color:var(--mute);cursor:default}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:4px}
+.info{width:100%;border-radius:20px;padding:6px 18px;background:var(--bg);box-shadow:inset 5px 5px 10px var(--dk),inset -5px -5px 10px var(--lt)}
+.info div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;font-size:12px}
+.info div+div{border-top:1px solid rgba(141,150,174,.25)}
+.info dt{color:var(--mute);flex:none}
+.info dd{margin:0;font-weight:600;text-align:right}
+.msg{font-size:12px;color:var(--mute);min-height:18px;text-align:center}
+h1{font-size:15px;font-weight:600;margin:0;text-align:center}
+h1 span{display:block;font-weight:400;color:var(--mute);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Tes Kecepatan Internet<span>Unduh, unggah, dan ping</span></h1>
+  <div class="dial">
+    <svg viewBox="0 0 300 300" aria-hidden="true">
+      <circle class="trkw" cx="150" cy="150" r="124"/>
+      <circle class="arc" id="arc" cx="150" cy="150" r="124"/>
+    </svg>
+    <div class="read" aria-live="polite">
+      <div class="num" id="num">0</div>
+      <div class="unit" id="unit">Mbps</div>
+      <div class="state"><i class="dot"></i><span id="state">Siap</span></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card" id="c-ping"><small>Ping</small><b id="v-ping">–</b><span>ms</span></div>
+    <div class="card" id="c-down"><small>Unduh</small><b id="v-down">–</b><span>Mbps</span></div>
+    <div class="card" id="c-up"><small>Unggah</small><b id="v-up">–</b><span>Mbps</span></div>
+  </div>
+  <dl class="info" style="margin:0">
+    <div><dt>Jenis koneksi</dt><dd id="i-net">Mendeteksi…</dd></div>
+    <div><dt>Penyedia (ISP)</dt><dd id="i-isp">Mendeteksi…</dd></div>
+    <div><dt>Perangkat</dt><dd id="i-dev">–</dd></div>
+    <div><dt>Server</dt><dd id="i-srv">Mendeteksi…</dd></div>
+  </dl>
+  <button id="go">Mulai tes</button>
+  <div class="msg" id="msg"></div>
+</main>
+<script>
+const B="https://speed.cloudflare.com", $=id=>document.getElementById(id);
+const R=124, C=2*Math.PI*R, arc=$("arc");
+arc.style.strokeDasharray=C; arc.style.strokeDashoffset=C;
+const MAX_MS=8000;
+const pct=v=>Math.min(1,Math.log10(v+1)/Math.log10(1001));
+const fmt=v=>v>=100?v.toFixed(0):v.toFixed(1);
+function gauge(v,unit,state,card){
+  $("num").textContent=fmt(v); $("unit").textContent=unit; $("state").textContent=state;
+  arc.style.strokeDashoffset=C*(1-(unit==="ms"?Math.min(1,v/200):pct(v)));
+  document.querySelectorAll(".card").forEach(c=>c.classList.remove("on"));
+  if(card)$(card).classList.add("on");
+}
+async function ping(){
+  const t=[];
+  for(let i=0;i<10;i++){
+    const s=performance.now();
+    await fetch(`${B}/__down?bytes=0&r=${Math.random()}`,{cache:"no-store"});
+    t.push(performance.now()-s);
+    gauge(t[t.length-1],"ms","Mengukur ping","c-ping");
+  }
+  t.sort((a,b)=>a-b);
+  return t[Math.floor(t.length/2)];
+}
+async function download(){
+  const s=performance.now(); let bytes=0;
+  const work=async()=>{
+    while(performance.now()-s<MAX_MS){
+      const r=await fetch(`${B}/__down?bytes=25000000&r=${Math.random()}`,{cache:"no-store"});
+      const rd=r.body.getReader();
+      for(;;){
+        const {done,value}=await rd.read();
+        if(done)break;
+        bytes+=value.length;
+        const e=(performance.now()-s)/1000;
+        if(e>0.4)gauge(bytes*8/e/1e6,"Mbps","Mengukur unduh","c-down");
+        if(performance.now()-s>=MAX_MS){rd.cancel();break}
+      }
+    }
+  };
+  await Promise.all([work(),work(),work()]);
+  return bytes*8/((performance.now()-s)/1000)/1e6;
+}
+async function upload(){
+  const blob=new Blob([new Uint8Array(3e6)]);
+  const s=performance.now(); let bytes=0;
+  const work=async()=>{
+    while(performance.now()-s<MAX_MS){
+      await new Promise(res=>{
+        const x=new XMLHttpRequest(); let last=0;
+        x.open("POST",`${B}/__up`);
+        x.upload.onprogress=e=>{
+          bytes+=e.loaded-last; last=e.loaded;
+          const t=(performance.now()-s)/1000;
+          if(t>0.4)gauge(bytes*8/t/1e6,"Mbps","Mengukur unggah","c-up");
+        };
+        x.onload=x.onerror=x.onabort=res;
+        x.send(blob);
+      });
+    }
+  };
+  await Promise.all([work(),work(),work()]);
+  return bytes*8/((performance.now()-s)/1000)/1e6;
+}
+function netInfo(){
+  const c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  if(!c)return "Tidak terdeteksi";
+  const T={wifi:"Wi-Fi",cellular:"Seluler",ethernet:"Ethernet",bluetooth:"Bluetooth",wimax:"WiMAX",other:"Lainnya"};
+  const t=T[c.type]||"";
+  const e=c.effectiveType?c.effectiveType.toUpperCase():"";
+  return [t,e].filter(Boolean).join(" · ")||"Tidak terdeteksi";
+}
+function devInfo(){
+  const u=navigator.userAgent;
+  const os=/Android/.test(u)?"Android":/iPhone|iPad|iPod/.test(u)?"iOS":/Windows/.test(u)?"Windows":/Mac OS X/.test(u)?"macOS":/Linux/.test(u)?"Linux":"Tidak dikenal";
+  const br=/Edg\//.test(u)?"Edge":/OPR\//.test(u)?"Opera":/Firefox\//.test(u)?"Firefox":/Chrome\//.test(u)?"Chrome":/Safari\//.test(u)?"Safari":"Browser";
+  const m=u.match(/Android[^;]*;\s*([^;)]+)/);
+  const model=m&&!/^(K|Mobile)$/.test(m[1].trim())?m[1].trim()+" · ":"";
+  return model+os+" · "+br;
+}
+async function loadInfo(){
+  $("i-net").textContent=netInfo();
+  $("i-dev").textContent=devInfo();
+  try{
+    const m=await (await fetch(`${B}/meta`,{cache:"no-store"})).json();
+    $("i-isp").textContent=m.asOrganization||"Tidak terdeteksi";
+    $("i-srv").textContent="Cloudflare"+(m.colo&&m.colo.city?" · "+m.colo.city:"")+(m.colo&&m.colo.iata?" ("+m.colo.iata+")":"");
+  }catch(e){
+    $("i-isp").textContent="Tidak terdeteksi";
+    $("i-srv").textContent="Cloudflare";
+  }
+}
+loadInfo();
+if(navigator.connection)navigator.connection.addEventListener("change",()=>{$("i-net").textContent=netInfo()});
+$("go").onclick=async()=>{
+  const btn=$("go"); btn.disabled=true; btn.textContent="Menguji…";
+  ["v-ping","v-down","v-up"].forEach(i=>$(i).textContent="–");
+  $("msg").textContent="";
+  try{
+    const p=await ping(); $("v-ping").textContent=Math.round(p);
+    const d=await download(); $("v-down").textContent=fmt(d);
+    const u=await upload(); $("v-up").textContent=fmt(u);
+    gauge(d,"Mbps","Selesai");
+    $("msg").textContent="Angka besar menunjukkan kecepatan unduh.";
+    btn.textContent="Ulangi tes";
+  }catch(e){
+    gauge(0,"Mbps","Gagal");
+    $("msg").textContent="Tidak bisa terhubung ke server tes. Periksa koneksi, lalu coba lagi.";
+    btn.textContent="Coba lagi";
+  }
+  btn.disabled=false;
+};
+</script>
+</body>
+</html>
